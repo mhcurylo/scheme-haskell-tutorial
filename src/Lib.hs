@@ -21,6 +21,7 @@ someFunc = do
     putStrLn (readExpr "\"this is \\\"test \\\" message \\\"sample\\\" text\"")
     putStrLn (readExpr "22")
     putStrLn (readExpr "#o22")
+    putStrLn (readExpr "#t")
     putStrLn (readExpr expr)
 
 symbol:: Parser Char
@@ -56,7 +57,7 @@ parseAtom = do
                 _    -> Atom atom
 
 parseNumber:: Parser LispVal
-parseNumber = Number <$> (intBase10 <|> intBase)
+parseNumber = Number <$> (intBase10 <|> try intBase)
 
 intBase10:: Parser Integer
 intBase10 = read <$> many1 digit
