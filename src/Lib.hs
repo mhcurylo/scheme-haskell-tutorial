@@ -13,6 +13,7 @@ data LispVal = Atom String
              | Number Integer
              | String String
              | Bool Bool
+             | Character Char 
              deriving (Show)
 
 someFunc :: IO ()
@@ -21,6 +22,8 @@ someFunc = do
     putStrLn (readExpr "\"this is \\\"test \\\" message \\\"sample\\\" text\"")
     putStrLn (readExpr "22")
     putStrLn (readExpr "#o22")
+    putStrLn (readExpr "#\\A")
+    putStrLn (readExpr "space")
     putStrLn (readExpr "#t")
     putStrLn (readExpr expr)
 
@@ -50,11 +53,31 @@ parseAtom:: Parser LispVal
 parseAtom = do
     first <- letter <|> symbol
     rest <- many (letter <|> digit <|> symbol)
-    let atom = first:rest
-    return $ case atom of 
-                "#t" -> Bool True
-                "#f" -> Bool False
-                _    -> Atom atom
+    return $ Atom $ first:rest
+
+parseBool:: Parser LispVal
+parseBool = do
+    a <- char '#'
+    b <- oneOf "tf"
+    let v = [a, b]
+    return $ Bool $ case v of
+                "#t" -> True
+                "#f" -> False
+
+parseChar:: Parser LispVal
+parseChar = do
+    a <- string "#\\"
+    b <- try (string "newline" <|> string "space") <|> parseSingleChar
+    return $ Character $ case b of
+                "space" -> ' '
+                "newline" -> '\n'
+                _ -> head b
+
+parseSingleChar:: Parser String
+parseSingleChar = do
+    a <- anyChar
+    b <- char ' ' <|> char ')' <|> char '('
+    return [a];
 
 parseNumber:: Parser LispVal
 parseNumber = Number <$> (intBase10 <|> try intBase)
@@ -76,8 +99,9 @@ intBase = do
         extract = fst . head
 
 
+
 parserExpr:: Parser LispVal
-parserExpr = parseNumber <|> parseAtom <|> parseString
+parserExpr = try parseNumber <|> try parseBool <|> try parseChar <|> parseAtom <|> parseString
 
 spaces:: Parser ()
 spaces = skipMany1 space
