@@ -111,16 +111,12 @@ parseExpr = try parseNumber
 parseParens:: Parser LispVal
 parseParens = do
     char '('
-    a <- parseExpr `endBy` spaces
-    b <- option (List []) a parseList
+    a <- parseExpr `sepEndBy` spaces
+    mayb <- optionMaybe (char '.' >> spaces >> parseExpr)
     char ')'
-    return $ List b
-    
-parseList :: Parser LispVal
-parseList = List <$> sepBy parseExpr spaces
-
---parseDottedList :: Parser LispVal
---parseDottedList = DottedList _ <$> char '.' >> spaces >> parseExpr
+    return $ case mayb of 
+      Nothing -> List a
+      Just b -> DottedList a b
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
