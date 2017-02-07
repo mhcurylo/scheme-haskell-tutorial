@@ -25,6 +25,7 @@ parser = do
     putStrLn (readExpr "#\\A")
     putStrLn (readExpr "space")
     putStrLn (readExpr "#t")
+    putStrLn (readExpr "(#t)")
     putStrLn (readExpr expr)
 
 symbol:: Parser Char
@@ -55,23 +56,39 @@ parseAtom = do
     rest <- many (letter <|> digit <|> symbol)
     return $ Atom $ first:rest
 
+parseHash:: Parser LispVal
+parseHash = do
+    a <- char '#'
+    b <- parseBool <|> parseChar <|> parseBase
+    return b
+
 parseBool:: Parser LispVal
 parseBool = do
-    a <- char '#'
-    b <- oneOf "tf"
-    let v = [a, b]
+    v <- oneOf "tf"
     return $ Bool $ case v of
-                "#t" -> True
-                "#f" -> False
+                't' -> True
+                'f' -> False
 
 parseChar:: Parser LispVal
 parseChar = do
-    a <- string "#\\"
+    a <- char '\\'
     b <- try (string "newline" <|> string "space") <|> parseSingleChar
     return $ Character $ case b of
                 "space" -> ' '
                 "newline" -> '\n'
                 _ -> head b
+
+parseBase:: Parser LispVal 
+parseBase = do
+    a <- oneOf "doh"
+    v <- many1 digit 
+    return $ Number . toInteger $ case a of 
+                'd' -> extract $ readDec v
+                'o' -> extract $ readOct v
+                'h' -> extract $ readHex v
+    where
+        extract = fst . head
+
 
 parseSingleChar:: Parser String
 parseSingleChar = do
@@ -80,33 +97,41 @@ parseSingleChar = do
     return [a];
 
 parseNumber:: Parser LispVal
-parseNumber = Number <$> (intBase10 <|> try intBase)
+parseNumber = Number . read <$> many1 digit
 
-intBase10:: Parser Integer
-intBase10 = read <$> many1 digit
+parseExpr:: Parser LispVal
+parseExpr = try parseNumber 
+         <|> try parseBool 
+         <|> try parseChar 
+         <|> parseAtom
+         <|> parseString
+         <|> parseQuoted
+         <|> parseParens
 
-intBase:: Parser Integer 
-intBase = do
-    a <- char '#'
-    b <- oneOf "doh"
-    v <- many1 digit 
-    let base = [a, b]
-    return $ toInteger $ case base of 
-                "#d" -> extract $ readDec v
-                "#o" -> extract $ readOct v
-                "#h" -> extract $ readHex v
-    where
-        extract = fst . head
+parseParens:: Parser LispVal
+parseParens = do
+    char '('
+    a <- parseExpr `endBy` spaces
+    b <- option (List []) a parseList
+    char ')'
+    return $ List b
+    
+parseList :: Parser LispVal
+parseList = List <$> sepBy parseExpr spaces
 
+--parseDottedList :: Parser LispVal
+--parseDottedList = DottedList _ <$> char '.' >> spaces >> parseExpr
 
-
-parserExpr:: Parser LispVal
-parserExpr = try parseNumber <|> try parseBool <|> try parseChar <|> parseAtom <|> parseString
+parseQuoted :: Parser LispVal
+parseQuoted = do
+    char '\''
+    x <- parseExpr
+    return $ List [Atom "quote", x]
 
 spaces:: Parser ()
 spaces = skipMany1 space
 
 readExpr :: String -> String
-readExpr input = case parse parserExpr "lisp" input of
+readExpr input = case parse parseExpr "lisp" input of
     Left err -> "No match: " ++ show err
     Right val -> "Found value" ++ show val 
