@@ -6,14 +6,17 @@ import Text.ParserCombinators.Parsec
 arbitarySymbol = sublistOf "!#$%&|*+-/:<=>?@^_~"
 arbitaryAZ = listOf $ elements ['a'..'z']
 
-parserConfirm:: Parser a -> String -> Bool
-parserConfirm p x = case (parse p "" x) of
+parserConfirm:: Parser a -> Bool -> String -> Bool
+parserConfirm p b x = b == case parse p "" x of
                      Left err  -> False
                      Right val -> True
+                     
+parserLog:: Parser a -> Bool -> String -> Property
+parserLog p i x = collect x $ parserConfirm p i x
 
 -- show
-prop_SymbolRight = forAll arbitarySymbol $ parserConfirm symbol
-prop_SymbolLeft = forAll arbitaryAZ $ not . parserConfirm symbol
+prop_SymbolRight = forAll arbitarySymbol $ parserConfirm symbol True
+prop_SymbolLeft = forAll arbitaryAZ $ parserLog symbol False
 
 main = do
   quickCheck prop_SymbolRight
