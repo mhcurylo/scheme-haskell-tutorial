@@ -1,6 +1,7 @@
 module Parser 
     ( parser,
-      symbol
+      symbol,
+      parseString
     ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -42,7 +43,7 @@ parseString = do
 escape :: Parser String
 escape = do
     d <- char '\\'
-    c <- oneOf "\\\"0nrvtbf" -- all the characters which can be escaped
+    c <- oneOf "\\\"0nrvtbf"
     return [d, c]
 
 nonEscape :: Parser Char
