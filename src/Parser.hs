@@ -1,7 +1,9 @@
 module Parser 
     ( parser,
       symbol,
-      parseString
+      parseString,
+      parseAtom,
+      LispVal, 
     ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
