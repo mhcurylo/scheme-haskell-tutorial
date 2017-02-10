@@ -12,9 +12,11 @@ stringOf = listOf1 . elements
 
 arbitrarySymbol = stringOf symbols
 arbitraryNumeric = stringOf numerics
-arbitraryAlphaNumeric = stringOf symbols
-arbitraryString = (\a -> "\"" ++ a ++ "\"") <$> stringOf (symbols ++ alphas ++ numerics) 
-
+arbitraryAlphaNumeric = stringOf (numerics ++ alphas) 
+arbitraryAlphaSymbolic = stringOf (symbols ++ alphas) 
+arbitraryAlphaSymbolicNumeric = stringOf (symbols ++ numerics ++ alphas) 
+arbitraryString = (\a -> "\"" ++ a ++ "\"") <$> arbitraryAlphaSymbolicNumeric
+arbitraryAtom = liftM2 (++) arbitraryAlphaSymbolic arbitraryAlphaSymbolicNumeric 
 
 parserConfirm:: Parser a -> Bool -> String -> Bool
 parserConfirm p b x = b == case parse p "" x of
@@ -26,17 +28,15 @@ parserLog p i x = collect x $ parserConfirm p i x
 
 -- show
 prop_SymbolRight = forAll arbitrarySymbol $ parserConfirm symbol True
-prop_SymbolLeft = forAll arbitraryAlphaNumeric $ parserLog symbol False
+prop_SymbolLeft = forAll arbitraryAlphaNumeric $ parserConfirm symbol False
 
 prop_StringRight = forAll arbitraryString $ parserConfirm parseString True
-prop_StringLeft = forAll arbitraryAlphaNumeric $ parserConfirm parseString False
+prop_StringLeft = forAll arbitraryAlphaSymbolicNumeric $ parserConfirm parseString False
 
-
-prop_AtomRight = forAll arbitrarySymbol $ parserConfirm parseAtom True
+prop_AtomRight = forAll arbitraryAtom $ parserConfirm parseAtom True
 prop_AtomLeft = forAll arbitraryNumeric $ parserConfirm parseAtom False
 
 main = do
-  sample arbitrarySymbol
   quickCheck prop_SymbolRight
   quickCheck prop_SymbolLeft
   quickCheck prop_StringRight
