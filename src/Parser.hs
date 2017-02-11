@@ -3,7 +3,7 @@ module Parser
       symbol,
       parseString,
       parseAtom,
-      LispVal, 
+      LispVal(..), 
     ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -18,18 +18,11 @@ data LispVal = Atom String
              | String String
              | Bool Bool
              | Character Char 
-             deriving (Show)
+             deriving (Show, Eq)
 
 parser :: IO ()
 parser = do
     (expr:_) <- getArgs
-    putStrLn (readExpr "\"this is \\\"test \\\" message \\\"sample\\\" text\"")
-    putStrLn (readExpr "22")
-    putStrLn (readExpr "#o22")
-    putStrLn (readExpr "#\\A")
-    putStrLn (readExpr "space")
-    putStrLn (readExpr "#t")
-    putStrLn (readExpr "(#t)")
     putStrLn (readExpr expr)
 
 symbol:: Parser Char

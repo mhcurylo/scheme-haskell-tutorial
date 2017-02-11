@@ -7,6 +7,7 @@ import Control.Monad
 symbols = "!#$%&|*+-/:<=>?@^_~"
 alphas = ['a'..'z'] ++ ['A'..'Z']
 numerics = ['0'..'9']
+escapes = "\"\\0nrvtbf"
 
 stringOf = listOf1 . elements 
 
@@ -17,6 +18,9 @@ arbitraryAlphaSymbolic = stringOf (symbols ++ alphas)
 arbitraryAlphaSymbolicNumeric = stringOf (symbols ++ numerics ++ alphas) 
 arbitraryString = (\a -> "\"" ++ a ++ "\"") <$> arbitraryAlphaSymbolicNumeric
 arbitraryAtom = liftM2 (++) arbitraryAlphaSymbolic arbitraryAlphaSymbolicNumeric 
+arbitraryEscape = (\a -> ['\\', a]) <$> elements escapes
+arbitraryStringWithEscape = (\a -> "\"" ++ a ++ "\"") <$> liftM2 (++) arbitraryAlphaSymbolicNumeric arbitraryEscape
+
 
 parserConfirm:: Parser a -> Bool -> String -> Bool
 parserConfirm p b x = b == case parse p "" x of
@@ -26,21 +30,31 @@ parserConfirm p b x = b == case parse p "" x of
 parserLog:: Parser a -> Bool -> String -> Property
 parserLog p i x = collect x $ parserConfirm p i x
 
+parserEq:: Parser LispVal -> (String -> LispVal) -> String -> Bool
+parserEq p g x = case parse p "" x of 
+                     Left err -> False
+                     Right val -> val == g x 
+
 -- show
 prop_SymbolRight = forAll arbitrarySymbol $ parserConfirm symbol True
 prop_SymbolLeft = forAll arbitraryAlphaNumeric $ parserConfirm symbol False
 
 prop_StringRight = forAll arbitraryString $ parserConfirm parseString True
 prop_StringLeft = forAll arbitraryAlphaSymbolicNumeric $ parserConfirm parseString False
+prop_StringEscape = forAll arbitraryStringWithEscape $ parserEq parseString (String . tail . init) 
 
 prop_AtomRight = forAll arbitraryAtom $ parserConfirm parseAtom True
 prop_AtomLeft = forAll arbitraryNumeric $ parserConfirm parseAtom False
 
+
+
 main = do
+  sample arbitraryStringWithEscape
   quickCheck prop_SymbolRight
   quickCheck prop_SymbolLeft
   quickCheck prop_StringRight
   quickCheck prop_StringLeft
+  quickCheck prop_StringEscape
   quickCheck prop_AtomRight
   quickCheck prop_AtomLeft
 -- /show
