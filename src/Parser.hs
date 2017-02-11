@@ -1,5 +1,5 @@
 module Parser 
-    ( parser,
+    ( readExpr,
       symbol,
       parseString,
       parseAtom,
@@ -8,7 +8,6 @@ module Parser
     ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
-import System.Environment
 import Control.Monad
 import Numeric (readHex, readDec, readOct)
 
@@ -20,11 +19,6 @@ data LispVal = Atom String
              | Bool Bool
              | Character Char 
              deriving (Show, Eq)
-
-parser :: IO ()
-parser = do
-    (expr:_) <- getArgs
-    putStrLn (readExpr expr)
 
 symbol:: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"

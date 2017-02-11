@@ -1,8 +1,11 @@
 module Lib
-    ( someFunc,
+    ( interpreter,
     ) where
 
 import Parser
+import System.Environment
 
-someFunc :: IO ()
-someFunc = parser
+interpreter :: IO ()
+interpreter = do
+    (expr:_) <- getArgs
+    putStrLn (readExpr expr)
