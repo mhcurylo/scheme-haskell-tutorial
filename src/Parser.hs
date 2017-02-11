@@ -3,6 +3,7 @@ module Parser
       symbol,
       parseString,
       parseAtom,
+      parseHash,
       LispVal(..), 
     ) where
 
