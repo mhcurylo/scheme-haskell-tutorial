@@ -88,7 +88,7 @@ parseBase = do
 parseSingleChar:: Parser String
 parseSingleChar = do
     x <- anyChar
-    _ <- char ' ' <|> char ')' <|> char '('
+    _ <- try $ lookAhead $ oneOf " ()"
     return [x];
 
 parseNumber:: Parser LispVal
@@ -98,8 +98,8 @@ parseExpr:: Parser LispVal
 parseExpr =  parseNumber 
          <|> parseString
          <|> parseHash
-         <|> parseParens
          <|> parseAtom
+         <|> parseParens
 
 parseParens:: Parser LispVal
 parseParens = do

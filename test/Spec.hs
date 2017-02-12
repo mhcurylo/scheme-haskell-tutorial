@@ -23,8 +23,8 @@ arbitraryAlphaNumeric = stringOf (numerics ++ alphas)
 arbitraryAlphaSymbolic = stringOf (symbols ++ alphas) 
 arbitraryAlphaSymbolicNumeric = stringOf (symbols ++ numerics ++ alphas) 
 arbitraryString = surround "\"" "\"" <$> arbitraryAlphaSymbolicNumeric
-arbitraryAtom = suchThat atom' (\(x:xs) -> '#' /= x)
-                    where atom' = liftM2 (++) arbitraryAlphaSymbolic arbitraryAlphaSymbolicNumeric
+arbitraryAtom = suchThat atom' (\(x:y:s) -> notElem x "#" )
+                  where atom' = liftM2 (++) arbitraryAlphaSymbolic arbitraryAlphaSymbolicNumeric
 arbitraryEscape = (\x -> ['\\', x]) <$> elements escapes
 arbitraryStringWithEscape =surround "\"" "\""<$> liftM2 (++) arbitraryAlphaSymbolicNumeric arbitraryEscape
 arbitraryBool = (\x -> ['#', x]) <$> elements "tf"
@@ -35,13 +35,20 @@ arbitraryBaseNum = (\x -> "#d" ++ x) <$> arbitraryNumeric
 arbitraryParens = surround "(" ")" . init <$> arbitraryManySExp
 arbitraryManySExp = concat <$> listOf1 arbitrarySpacedLispVal
 arbitrarySpacedLispVal = surround "" " " <$> arbitraryLispValString
-arbitraryLispValString = oneof [arbitraryChar,
+arbitraryLispValString = frequency [(10, arbitraryCharSafe),
+                                    (10, arbitraryBool), 
+                                    (10, arbitraryBaseNum), 
+                                    (10, arbitraryString),
+                                    (10, arbitraryAtom),
+                                    (1, arbitraryParens),
+                                    (10, arbitraryNumeric)]
+arbitraryExpr =          oneof [arbitraryChar,
                                 arbitraryBool, 
                                 arbitraryBaseNum, 
                                 arbitraryString,
                                 arbitraryAtom,
-                                arbitraryNumeric,
-                                arbitraryParens]
+                                arbitraryNumeric]
+
 
 parserConfirm:: Parser a -> Bool -> String -> Bool
 parserConfirm p b x = b == case parse p "" x of
@@ -103,7 +110,7 @@ prop_NumLeft = forAll arbitraryAlphaSymbolic $ parserConfirm parseNumber False
 prop_ParensRight = forAll arbitraryParens $ parserConfirm parseParens True
 prop_ParensLeft = forAll arbitraryAlphaSymbolicNumeric $ parserConfirm parseParens False
 
-prop_LispValRight = forAll arbitraryLispValString $ parserConfirm parseExpr True
+prop_ExprRight = forAll arbitraryExpr $ parserConfirm parseExpr True
 
 main = do
   putStr "\n--- Testing parsers \n"
@@ -117,10 +124,11 @@ main = do
   putStr "\n--- Atom \n"
   quickCheck prop_AtomRight
   quickCheck prop_AtomLeft
+  putStr "\n--- Hashes negative \n"
+  quickCheck prop_HashLeftAN
+  quickCheck prop_HashLeftAtom
   putStr "\n--- Bool \n"
   quickCheck prop_BooleanRight
-  quickCheck prop_HashLeftAN
-  quickCheckWith stdArgs { maxSuccess = 100 } prop_HashLeftAtom
   putStr "\n--- Char \n"
   quickCheck prop_CharRight
   putStr "\n--- Nums \n"
@@ -131,4 +139,4 @@ main = do
   quickCheck prop_ParensRight
   quickCheck prop_ParensLeft
   putStr "\n--- Expr \n"
-  quickCheck prop_LispValRight
+  quickCheck prop_ExprRight
