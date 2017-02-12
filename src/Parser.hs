@@ -4,6 +4,9 @@ module Parser
       parseString,
       parseAtom,
       parseHash,
+      parseNumber,
+      parseExpr,
+      parseParens,
       LispVal(..), 
     ) where
 
@@ -32,9 +35,9 @@ parseString = do
 
 escape :: Parser String
 escape = do
-    d <- char '\\'
-    c <- oneOf "\\\"0nrvtbf"
-    return [d, c]
+    x <- char '\\'
+    y <- oneOf "\\\"0nrvtbf"
+    return [x, y]
 
 nonEscape :: Parser Char
 nonEscape = noneOf "\\\""
@@ -44,9 +47,9 @@ character = fmap return nonEscape <|> escape
 
 parseAtom:: Parser LispVal
 parseAtom = do
-    first <- letter <|> symbol
-    rest <- many (letter <|> digit <|> symbol)
-    return $ Atom $ first:rest
+    x <- letter <|> symbol
+    xs <- many (letter <|> digit <|> symbol)
+    return $ Atom $ x:xs
 
 parseHash:: Parser LispVal
 parseHash = do
@@ -84,31 +87,29 @@ parseBase = do
 
 parseSingleChar:: Parser String
 parseSingleChar = do
-    a <- anyChar
-    b <- char ' ' <|> char ')' <|> char '('
-    return [a];
+    x <- anyChar
+    _ <- char ' ' <|> char ')' <|> char '('
+    return [x];
 
 parseNumber:: Parser LispVal
 parseNumber = Number . read <$> many1 digit
 
 parseExpr:: Parser LispVal
-parseExpr = try parseNumber 
-         <|> try parseBool 
-         <|> try parseChar 
-         <|> parseAtom
+parseExpr =  parseNumber 
          <|> parseString
-         <|> parseQuoted
+         <|> parseHash
          <|> parseParens
+         <|> parseAtom
 
 parseParens:: Parser LispVal
 parseParens = do
     char '('
-    a <- parseExpr `sepEndBy` spaces
+    x <- parseExpr `sepEndBy` spaces
     mayb <- optionMaybe (char '.' >> spaces >> parseExpr)
     char ')'
     return $ case mayb of 
-      Nothing -> List a
-      Just b -> DottedList a b
+      Nothing -> List x
+      Just y -> DottedList x y
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
