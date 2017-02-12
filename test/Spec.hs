@@ -36,7 +36,7 @@ arbitraryParens = surround "(" ")" . init <$> arbitraryManySExp
 arbitraryManySExp = concat <$> listOf1 arbitrarySpacedLispVal
 arbitrarySpacedLispVal = surround "" " " <$> arbitraryLispValString
 arbitraryLispValString = frequency [(10, arbitraryCharSafe),
-                                    (10, arbitraryBool), 
+                                    (2, arbitraryBool), 
                                     (10, arbitraryBaseNum), 
                                     (10, arbitraryString),
                                     (10, arbitraryAtom),
