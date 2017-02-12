@@ -1,8 +1,8 @@
 import Test.QuickCheck
 import Data.List (intersperse)
-import Parser 
 import Text.ParserCombinators.Parsec
 import Control.Monad
+import Parser
 import Numeric (readHex, readDec, readOct)
 
 symbols = "!#$%&|*+-/:<=>?@^_~"
@@ -15,6 +15,7 @@ stringOf = listOf1 . elements
 surround:: String -> String -> String -> String
 surround x y = (x ++) . (++ y)
 
+
 arbitrarySymbol = stringOf symbols
 arbitraryNumeric = stringOf numerics
 arbitraryAlpha = stringOf alphas
@@ -22,7 +23,8 @@ arbitraryAlphaNumeric = stringOf (numerics ++ alphas)
 arbitraryAlphaSymbolic = stringOf (symbols ++ alphas) 
 arbitraryAlphaSymbolicNumeric = stringOf (symbols ++ numerics ++ alphas) 
 arbitraryString = surround "\"" "\"" <$> arbitraryAlphaSymbolicNumeric
-arbitraryAtom = liftM2 (++) arbitraryAlphaSymbolic arbitraryAlphaSymbolicNumeric 
+arbitraryAtom = suchThat atom' (\(x:xs) -> '#' /= x)
+                    where atom' = liftM2 (++) arbitraryAlphaSymbolic arbitraryAlphaSymbolicNumeric
 arbitraryEscape = (\x -> ['\\', x]) <$> elements escapes
 arbitraryStringWithEscape =surround "\"" "\""<$> liftM2 (++) arbitraryAlphaSymbolicNumeric arbitraryEscape
 arbitraryBool = (\x -> ['#', x]) <$> elements "tf"
@@ -88,13 +90,12 @@ prop_AtomRight = forAll arbitraryAtom $ parserEq parseAtom Atom
 prop_AtomLeft = forAll arbitraryNumeric $ parserConfirm parseAtom False
 
 prop_BooleanRight = forAll arbitraryBool $ parserEq parseHash schemeBool
-prop_BooleanLeft = forAll arbitraryAlphaNumeric $ parserConfirm parseHash False 
+prop_HashLeftAN = forAll arbitraryAlphaNumeric $ parserConfirm parseHash False 
+prop_HashLeftAtom = forAll arbitraryAtom $ parserConfirm parseHash False 
 
 prop_CharRight = forAll arbitraryChar $ parserEq parseHash schemeChar
-prop_CharLeft = forAll arbitraryAlphaSymbolicNumeric $ parserConfirm parseHash False 
 
 prop_BaseNumRight = forAll arbitraryBaseNum $ parserEq parseHash schemeBaseNum
-prop_BaseNumLeft = forAll arbitraryAlphaSymbolic $ parserConfirm parseHash False 
 
 prop_NumRight = forAll arbitraryNumeric $ parserEq parseNumber schemeNum
 prop_NumLeft = forAll arbitraryAlphaSymbolic $ parserConfirm parseNumber False 
@@ -106,21 +107,28 @@ prop_LispValRight = forAll arbitraryLispValString $ parserConfirm parseExpr True
 
 main = do
   putStr "\n--- Testing parsers \n"
+  putStr "\n--- Symbol \n"
   quickCheck prop_SymbolRight
   quickCheck prop_SymbolLeft
+  putStr "\n--- String \n"
   quickCheck prop_StringRight
   quickCheck prop_StringLeft
   quickCheck prop_StringEscape
+  putStr "\n--- Atom \n"
   quickCheck prop_AtomRight
   quickCheck prop_AtomLeft
+  putStr "\n--- Bool \n"
   quickCheck prop_BooleanRight
-  quickCheck prop_BooleanLeft
+  quickCheck prop_HashLeftAN
+  quickCheckWith stdArgs { maxSuccess = 100 } prop_HashLeftAtom
+  putStr "\n--- Char \n"
   quickCheck prop_CharRight
-  quickCheck prop_CharLeft
+  putStr "\n--- Nums \n"
   quickCheck prop_BaseNumRight
-  quickCheck prop_BaseNumLeft
   quickCheck prop_NumRight
   quickCheck prop_NumLeft
+  putStr "\n--- Parens \n"
   quickCheck prop_ParensRight
   quickCheck prop_ParensLeft
+  putStr "\n--- Expr \n"
   quickCheck prop_LispValRight
