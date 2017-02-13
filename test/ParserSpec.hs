@@ -38,6 +38,7 @@ arbitraryChar = oneof [elements ["#\\space", "#\\newline"], arbitrarySingleChar]
 arbitrarySingleChar = liftM2 (\x y -> "#\\" ++ [x, y]) (elements (symbols ++ alphas ++ numerics)) (elements " ()")
 arbitraryCharSafe = oneof [elements ["#\\space", "#\\newline"], surround "#\\" "" . (:[])<$> elements (symbols ++ alphas ++ numerics)]
 arbitraryBaseNum = (\x -> "#d" ++ x) <$> arbitraryNumeric
+arbitraryQuoted = (\x -> "\'" ++ x ++ " ") <$> resize 1 arbitraryLispValString
 arbitraryParens = surround "(" ")" . init <$> arbitraryManySExp
 arbitraryManySExp = concat <$> listOf1 arbitrarySpacedLispVal
 arbitrarySpacedLispVal = surround "" " " <$> arbitraryLispValString
@@ -46,15 +47,17 @@ arbitraryLispValString = frequency [(10, arbitraryCharSafe),
                                     (10, arbitraryBaseNum), 
                                     (10, arbitraryString),
                                     (10, arbitraryAtom),
+                                    (10, arbitraryQuoted),
+                                    (10, arbitraryNumeric),
+                                    (1, arbitraryParens)]
+arbitraryExpr          = frequency [(10, arbitraryChar),
+                                    (2, arbitraryBool), 
+                                    (10, arbitraryBaseNum), 
+                                    (10, arbitraryString),
+                                    (10, arbitraryAtom),
                                     (1, arbitraryParens),
+                                    (10, arbitraryQuoted),
                                     (10, arbitraryNumeric)]
-arbitraryExpr =          oneof [arbitraryChar,
-                                arbitraryBool, 
-                                arbitraryBaseNum, 
-                                arbitraryString,
-                                arbitraryAtom,
-                                arbitraryNumeric]
-
 
 parserConfirm:: Parser a -> Bool -> String -> Bool
 parserConfirm p b x = b == case parse p "" x of
@@ -110,6 +113,8 @@ prop_CharRight = forAll arbitraryChar $ parserEq parseHash schemeChar
 
 prop_BaseNumRight = forAll arbitraryBaseNum $ parserEq parseHash schemeBaseNum
 
+prop_QuotedRight = forAll arbitraryQuoted $ parserConfirm parseQuoted True
+
 prop_NumRight = forAll arbitraryNumeric $ parserEq parseNumber schemeNum
 prop_NumLeft = forAll arbitraryAlphaSymbolic $ parserConfirm parseNumber False 
 
@@ -141,6 +146,8 @@ parserSpec = do
   quickCheck prop_BaseNumRight
   quickCheck prop_NumRight
   quickCheck prop_NumLeft
+  putStr "\n--- Quoted \n"
+  quickCheck prop_QuotedRight
   putStr "\n--- Parens \n"
   quickCheck prop_ParensRight
   quickCheck prop_ParensLeft

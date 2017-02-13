@@ -7,6 +7,7 @@ module Parser
       parseNumber,
       parseExpr,
       parseParens,
+      parseQuoted,
       LispVal(..), 
     ) where
 
@@ -21,7 +22,20 @@ data LispVal = Atom String
              | String String
              | Bool Bool
              | Character Char 
-             deriving (Show, Eq)
+             deriving (Eq)
+
+instance Show LispVal where show = showLispVal
+
+showLispVal:: LispVal -> String
+showLispVal (Character x) = x:""
+showLispVal (Atom x) = x
+showLispVal (Number x) = show x
+showLispVal (String x) = "\"" ++ x ++ "\""
+showLispVal (Bool True) = "#t"
+showLispVal (Bool False) = "#f"
+showLispVal (List xs) = "(" ++ unwords (map showLispVal xs) ++ ")"
+showLispVal (DottedList x xs) = "(" ++ unwords (map showLispVal x) ++ " . " ++ showLispVal xs ++ ")"
+
 
 symbol:: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -99,6 +113,7 @@ parseExpr =  parseNumber
          <|> parseString
          <|> parseHash
          <|> parseAtom
+         <|> parseQuoted
          <|> parseParens
 
 parseParens:: Parser LispVal
