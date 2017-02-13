@@ -6,8 +6,9 @@ import Test.QuickCheck
 import Data.List (intersperse)
 import Text.ParserCombinators.Parsec
 import Control.Monad
-import Parser
 import Numeric (readHex, readDec, readOct)
+import Parser
+import LispVal
 
 
 

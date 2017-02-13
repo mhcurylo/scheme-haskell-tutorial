@@ -8,34 +8,12 @@ module Parser
       parseExpr,
       parseParens,
       parseQuoted,
-      LispVal(..), 
     ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad
 import Numeric (readHex, readDec, readOct)
-
-data LispVal = Atom String
-             | List [LispVal]
-             | DottedList [LispVal] LispVal
-             | Number Integer
-             | String String
-             | Bool Bool
-             | Character Char 
-             deriving (Eq)
-
-instance Show LispVal where show = showLispVal
-
-showLispVal:: LispVal -> String
-showLispVal (Character x) = x:""
-showLispVal (Atom x) = x
-showLispVal (Number x) = show x
-showLispVal (String x) = "\"" ++ x ++ "\""
-showLispVal (Bool True) = "#t"
-showLispVal (Bool False) = "#f"
-showLispVal (List xs) = "(" ++ unwords (map showLispVal xs) ++ ")"
-showLispVal (DottedList x xs) = "(" ++ unwords (map showLispVal x) ++ " . " ++ showLispVal xs ++ ")"
-
+import LispVal
 
 symbol:: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -135,7 +113,7 @@ parseQuoted = do
 spaces:: Parser ()
 spaces = skipMany1 space
 
-readExpr :: String -> String
+readExpr :: String -> LispVal
 readExpr input = case parse parseExpr "lisp" input of
-    Left err -> "No match: " ++ show err
-    Right val -> "Found value" ++ show val 
+    Left err -> String $ ("No match: " ++ show err)
+    Right val -> val

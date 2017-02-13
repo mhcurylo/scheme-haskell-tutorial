@@ -2,10 +2,9 @@ module Lib
     ( interpreter,
     ) where
 
+import Evaluator
 import Parser
 import System.Environment
 
 interpreter :: IO ()
-interpreter = do
-    (expr:_) <- getArgs
-    putStrLn (readExpr expr)
+interpreter = getArgs >>= print . eval . readExpr . head
