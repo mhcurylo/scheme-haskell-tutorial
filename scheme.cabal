@@ -19,8 +19,10 @@ library
                      , Parser
                      , LispVal
                      , Evaluator
+                     , Errors
   build-depends:       base >= 4.7 && < 5
                      , parsec
+                     , mtl
   default-language:    Haskell2010
 
 executable scheme-exe
@@ -45,4 +47,4 @@ test-suite scheme-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/scheme
+  ocation: https://github.com/githubuser/scheme

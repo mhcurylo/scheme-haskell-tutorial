@@ -1,4 +1,4 @@
-module Parser 
+module Parser
     ( readExpr,
       symbol,
       parseString,
@@ -14,6 +14,8 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad
 import Numeric (readHex, readDec, readOct)
 import LispVal
+import Errors
+import Control.Monad.Error
 
 symbol:: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -113,7 +115,6 @@ parseQuoted = do
 spaces:: Parser ()
 spaces = skipMany1 space
 
-readExpr :: String -> LispVal
-readExpr input = case parse parseExpr "lisp" input of
-    Left err -> String $ ("No match: " ++ show err)
-    Right val -> val
+readExpr :: String -> Either LispErr LispVal
+readExpr input = parse parseExpr "lisp" input
+
