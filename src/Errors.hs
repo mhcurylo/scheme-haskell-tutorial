@@ -1,5 +1,6 @@
 module Errors (
       LispError(..),
+      ThrowsError,
       trapError,
       extractValue
     ) where 
@@ -26,10 +27,9 @@ showError (NumArgs expected found)      = "Expected " ++ show expected ++ " args
 showError (TypeMismatch expected found) = "Invalid type: expected " ++ expected ++ ", found " ++ show found
 showError (Parser parseErr)             = "Parse error at " ++ show parseErr
 
-instance MonadError LispErr where
-
+type ThrowsError = Either LispError
 
 trapError action = catchError action (return . show)
 
-extractValue :: LispErr a -> a
+extractValue :: ThrowsError a -> a
 extractValue (Right val) = val

@@ -115,6 +115,8 @@ parseQuoted = do
 spaces:: Parser ()
 spaces = skipMany1 space
 
-readExpr :: String -> Either LispErr LispVal
-readExpr input = parse parseExpr "lisp" input
+readExpr :: String -> ThrowsError LispVal
+readExpr input = case parse parseExpr "lisp" input of
+    Left err -> throwError $ Parser err
+    Right val -> return val
 
