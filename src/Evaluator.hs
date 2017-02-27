@@ -6,21 +6,25 @@ module Evaluator (
 
 import LispVal
 import Errors
+import Environment
 import Control.Monad.Except
 
-eval :: LispVal -> ThrowsError LispVal
-eval val@(String _) = return val
-eval val@(Number _) = return val
-eval val@(Bool _) = return val
-eval (List [Atom "quote", val]) = return val
-eval (List [Atom "if", pred, conseq, alt]) = 
-     do result <- eval pred
+eval :: Env -> LispVal -> IOThrowsError LispVal
+eval _ val@(String _) = return val
+eval _ val@(Number _) = return val
+eval _ val@(Bool _) = return val
+eval env (Atom id) = getVar env id
+eval _ (List [Atom "quote", val]) = return val
+eval env (List [Atom "if", pred, conseq, alt]) = 
+     do result <- eval env pred
         case result of
-          Bool False -> eval alt
-          Bool True -> eval conseq
+          Bool False -> eval env alt
+          Bool True -> eval env conseq
           _ -> throwError $ TypeMismatch "Bool" result
-eval (List (Atom func : args)) = mapM eval args >>= apply func
-eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
+eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
+eval env (List (Atom func : args)) = mapM (eval env) args >>= liftThrows . apply func
+eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
