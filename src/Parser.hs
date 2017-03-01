@@ -15,7 +15,7 @@ import Control.Monad
 import Numeric (readHex, readDec, readOct)
 import LispVal
 import Errors
-import Control.Monad.Error
+import Control.Monad.Except
 
 symbol:: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -67,17 +67,16 @@ parseChar = do
                 "newline" -> '\n'
                 _ -> head b
 
-parseBase:: Parser LispVal 
-parseBase = do
-    a <- oneOf "doh"
-    v <- many1 digit 
-    return $ Number . toInteger $ case a of 
-                'd' -> extract $ readDec v
-                'o' -> extract $ readOct v
-                'h' -> extract $ readHex v
-    where
-        extract = fst . head
+parseBase:: Parser LispVal
+parseBase = parseBaseD <|> parseBaseH
 
+parseBaseD:: Parser LispVal 
+parseBaseD = char 'd' >> many1 digit >>= \a -> toLispNumber $ readDec a 
+
+parseBaseH:: Parser LispVal 
+parseBaseH = char 'h' >> many1 (digit <|> oneOf "abcdef") >>= \a -> toLispNumber $ readHex a 
+
+toLispNumber a = return $ Number . toInteger $ fst . head $ a 
 
 parseSingleChar:: Parser String
 parseSingleChar = do
