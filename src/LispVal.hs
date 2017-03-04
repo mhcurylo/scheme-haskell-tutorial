@@ -8,6 +8,8 @@ module LispVal
 
 import Control.Monad.Except
 import Text.ParserCombinators.Parsec hiding (spaces)
+import Data.IORef
+type Env = IORef [(String, IORef LispVal)]
 
 data LispVal = Atom String
              | List [LispVal]
@@ -15,12 +17,16 @@ data LispVal = Atom String
              | Number Integer
              | String String
              | Bool Bool
-             | Character Char 
-             deriving (Eq)
+             | Character Char
+             | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
+             | Func {params:: [String],
+                     vararg:: (Maybe String),
+                     body:: [LispVal],
+                     closure:: Env}
 
 instance Show LispVal where show = showLispVal
 
-showLispVal:: LispVal -> String
+showLispVal :: LispVal -> String
 showLispVal (Character x) = x:""
 showLispVal (Atom x) = x
 showLispVal (Number x) = show x
@@ -29,6 +35,13 @@ showLispVal (Bool True) = "#t"
 showLispVal (Bool False) = "#f"
 showLispVal (List xs) = "(" ++ unwords (map showLispVal xs) ++ ")"
 showLispVal (DottedList x xs) = "(" ++ unwords (map showLispVal x) ++ " . " ++ showLispVal xs ++ ")"
+showLispVal (PrimitiveFunc _) = "<primitive>"
+showLispVal Func {params = args, vararg = varargs, body = body, closure = env} =
+                 "(lambda (" ++ unwords (map show args) ++
+                      (case varargs of
+                         Nothing -> ""
+                         Just arg -> " . " ++ arg) ++ ") ...)"
+
 
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
@@ -40,7 +53,7 @@ data LispError = NumArgs Integer [LispVal]
 
 instance Show LispError where show = showError
 
-showError:: LispError -> String
+showError :: LispError -> String
 showError (UnboundVar message varname)  = message ++ ": " ++ varname
 showError (BadSpecialForm message form) = message ++ ": " ++ show form
 showError (NotFunction message func)    = message ++ ": " ++ show func
