@@ -3,7 +3,6 @@ module Lib
     ) where
 
 import Evaluator
-import Errors
 import Environment
 import Parser
 import Control.Monad.Except

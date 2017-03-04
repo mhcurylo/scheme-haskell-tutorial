@@ -14,7 +14,6 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad
 import Numeric (readHex, readDec, readOct)
 import LispVal
-import Errors
 import Control.Monad.Except
 
 symbol:: Parser Char

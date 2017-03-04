@@ -5,7 +5,6 @@ module Evaluator (
 ) where
 
 import LispVal
-import Errors
 import Environment
 import Control.Monad.Except
 

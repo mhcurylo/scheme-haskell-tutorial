@@ -12,7 +12,6 @@ module Environment
   bindVars,
   ) where
 
-import Errors
 import Data.IORef
 import LispVal
 import Control.Monad.Except
