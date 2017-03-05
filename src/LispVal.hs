@@ -3,7 +3,6 @@ module LispVal
        LispError(..),
        ThrowsError,
        trapError,
-       showLispVal,
        extractValue
     ) where
 

@@ -80,7 +80,7 @@ primitives = [("+", numericBinop (+)),
               ("equal?", equal)]
 
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv >>= (flip bindVars $ map makePrimitiveFunc primitives)
+primitiveBindings = nullEnv >>= flip bindVars (map makePrimitiveFunc primitives)
      where makePrimitiveFunc (var, func) = (var, PrimitiveFunc func)
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
