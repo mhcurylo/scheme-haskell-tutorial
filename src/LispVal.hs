@@ -9,7 +9,10 @@ module LispVal
 import Control.Monad.Except
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Data.IORef
+import System.IO
+
 type Env = IORef [(String, IORef LispVal)]
+type IOThrowsError = ExceptT LispError IO
 
 data LispVal = Atom String
              | List [LispVal]
@@ -19,6 +22,8 @@ data LispVal = Atom String
              | Bool Bool
              | Character Char
              | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
+             | IOFunc ([LispVal] -> IOThrowsError LispVal)
+             | Port Handle
              | Func {params:: [String],
                      vararg:: (Maybe String),
                      body:: [LispVal],
@@ -35,6 +40,8 @@ showLispVal (Bool True) = "#t"
 showLispVal (Bool False) = "#f"
 showLispVal (List xs) = "(" ++ unwords (map showLispVal xs) ++ ")"
 showLispVal (DottedList x xs) = "(" ++ unwords (map showLispVal x) ++ " . " ++ showLispVal xs ++ ")"
+showLispVal (Port _)   = "<IO port>"
+showLispVal (IOFunc _) = "<IO primitive>"
 showLispVal (PrimitiveFunc _) = "<primitive>"
 showLispVal Func {params = args, vararg = varargs, body = body, closure = env} =
                  "(lambda (" ++ unwords (map show args) ++

@@ -7,7 +7,10 @@ module Evaluator (
 
 import LispVal
 import Environment
+import Parser
 import Control.Monad.Except
+import System.IO
+
 
 eval :: Env -> LispVal -> IOThrowsError LispVal
 eval _ val@(String _) = return val
@@ -28,6 +31,7 @@ eval env (List (Atom "define" : DottedList (Atom var : params') varargs : body')
 eval env (List (Atom "lambda" : List params' : body')) = makeNormalFunc env params' body'
 eval env (List (Atom "lambda" : DottedList params' varargs : body')) = makeVarArgs varargs env params' body'
 eval env (List (Atom "lambda" : varargs@(Atom _) : body')) = makeVarArgs varargs env [] body'
+eval env (List [Atom "load", String filename]) = load filename >>= liftM last . mapM (eval env)
 eval env (List (func : args)) = do func' <- eval env func
                                    argVals <- mapM (eval env) args
                                    apply func' argVals
@@ -37,8 +41,8 @@ makeFunc varargs env params body = return $ Func (map show params) varargs body 
 makeNormalFunc = makeFunc Nothing
 makeVarArgs = makeFunc . Just . show
 
-
 apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
+apply (IOFunc func) args = func args
 apply (PrimitiveFunc func) args = liftThrows $ func args
 apply (Func params varargs body closure) args =
       if num params /= num args && varargs == Nothing
@@ -79,9 +83,20 @@ primitives = [("+", numericBinop (+)),
               ("eqv?", eqv),
               ("equal?", equal)]
 
+ioPrimitives ::[(String, [LispVal] -> IOThrowsError LispVal)]
+ioPrimitives = [("apply", applyProc),
+                ("open-input-file", makePort ReadMode),
+                ("open-output-file", makePort WriteMode),
+                ("close-input-port", closePort),
+                ("close-output-port", closePort),
+                ("read", readProc),
+                ("write", writeProc),
+                ("read-contents", readContents),
+                ("read-all", readAll)]
+
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv >>= flip bindVars (map makePrimitiveFunc primitives)
-     where makePrimitiveFunc (var, func) = (var, PrimitiveFunc func)
+primitiveBindings = nullEnv >>= (flip bindVars (map (makeFunc IOFunc) ioPrimitives ++ map (makeFunc PrimitiveFunc) primitives))
+                 where makeFunc constructor (var, func) = (var, constructor func)
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
 numericBinop _ []  = throwError $ NumArgs 2 []
@@ -152,7 +167,7 @@ eqv [_, _]                                 = return $ Bool False
 eqv badArgList                             = throwError $ NumArgs 2 badArgList
 
 
-eqLispList:: ([LispVal] -> ThrowsError LispVal) -> [LispVal] -> ThrowsError LispVal
+eqLispList :: ([LispVal] -> ThrowsError LispVal) -> [LispVal] -> ThrowsError LispVal
 eqLispList f [DottedList xs x, DottedList ys y] = eqLispList f [List $ xs ++ [x], List $ ys ++ [y]]
 eqLispList f [List arg1, List arg2]             = return $ Bool $ (length arg1 == length arg2) && all eqvPair (zip arg1 arg2)
         where eqvPair (x1, x2) = case f [x1, x2] of
@@ -177,3 +192,31 @@ equal [arg1, arg2]       = do
                              return $ Bool (primitiveEquals || let (Bool x) = eqvEquals in x)
 
 equal badArgList = throwError $ NumArgs 2 badArgList
+
+applyProc :: [LispVal] -> IOThrowsError LispVal
+applyProc [func, List args] = apply func args
+applyProc (func : args)     = apply func args
+
+makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
+makePort mode [String filename] = liftM Port $ liftIO $ openFile filename mode
+
+closePort :: [LispVal] -> IOThrowsError LispVal
+closePort [Port port] = liftIO $ hClose port >> (return $ Bool True)
+closePort _           = return $ Bool False
+
+readProc :: [LispVal] -> IOThrowsError LispVal
+readProc []          = readProc [Port stdin]
+readProc [Port port] = (liftIO $ hGetLine port) >>= liftThrows . readExpr
+
+writeProc :: [LispVal] -> IOThrowsError LispVal
+writeProc [obj]            = writeProc [obj, Port stdout]
+writeProc [obj, Port port] = liftIO $ hPrint port obj >> (return $ Bool True)
+
+readContents :: [LispVal] -> IOThrowsError LispVal
+readContents [String filename] = liftM String $ liftIO $ readFile filename
+
+load :: String -> IOThrowsError [LispVal]
+load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
+
+readAll :: [LispVal] -> IOThrowsError LispVal
+readAll [String filename] = liftM List $ load filename

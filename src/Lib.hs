@@ -5,6 +5,7 @@ module Lib
 import Evaluator
 import Environment
 import Parser
+import LispVal
 import Control.Monad.Except
 import System.Environment
 import System.IO
@@ -13,8 +14,7 @@ interpreter :: IO ()
 interpreter = do args <- getArgs
                  case length args of
                    0 -> runRepl
-                   1 -> runOne $ head args
-                   _ -> putStrLn "Program takes one or no lines"
+                   _ -> runOne args
 
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
@@ -28,8 +28,10 @@ evalStr env expr = runIOThrows $ liftM show $ (liftThrows $ readExpr expr) >>= e
 evalAndPrint :: Env -> String -> IO ()
 evalAndPrint env expr = evalStr env expr >>= putStrLn
 
-runOne :: String -> IO ()
-runOne expr = primitiveBindings >>= flip evalAndPrint expr
+runOne :: [String] -> IO ()
+runOne args = do
+    env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
+    (runIOThrows $ liftM show $ eval env (List [Atom "load", String (args !! 0)])) >>= hPutStrLn stderr
 
 runRepl :: IO ()
 runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "Lisp>>> ") . evalAndPrint
