@@ -2,6 +2,7 @@
 
 module Evaluator (
     eval,
+    primitiveBindings
 ) where
 
 import LispVal
@@ -12,24 +13,43 @@ eval :: Env -> LispVal -> IOThrowsError LispVal
 eval _ val@(String _) = return val
 eval _ val@(Number _) = return val
 eval _ val@(Bool _) = return val
-eval env (Atom id) = getVar env id
+eval env (Atom id') = getVar env id'
 eval _ (List [Atom "quote", val]) = return val
-eval env (List [Atom "if", pred, conseq, alt]) = 
-     do result <- eval env pred
+eval env (List [Atom "if", pre, conseq, alt]) = 
+     do result <- eval env pre
         case result of
           Bool False -> eval env alt
           Bool True -> eval env conseq
           _ -> throwError $ TypeMismatch "Bool" result
 eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
 eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
-eval env (List (Atom func : args)) = mapM (eval env) args >>= liftThrows . apply func
-eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+eval env (List (Atom "define" : List (Atom var : params') : body')) = makeNormalFunc env params' body' >>= defineVar env var
+eval env (List (Atom "define" : DottedList (Atom var : params') varargs : body')) = makeVarArgs varargs env params' body' >>= defineVar env var
+eval env (List (Atom "lambda" : List params' : body')) = makeNormalFunc env params' body'
+eval env (List (Atom "lambda" : DottedList params' varargs : body')) = makeVarArgs varargs env params' body'
+eval env (List (Atom "lambda" : varargs@(Atom _) : body')) = makeVarArgs varargs env [] body'
+eval env (List (func : args)) = do func' <- eval env func
+                                   argVals <- mapM (eval env) args
+                                   apply func' argVals
+eval _ badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+makeFunc varargs env params body = return $ Func (map show params) varargs body env
+makeNormalFunc = makeFunc Nothing
+makeVarArgs = makeFunc . Just . show
 
 
-apply :: String -> [LispVal] -> ThrowsError LispVal
-apply func args = maybe (throwError $ NotFunction "Unrecognized primitive function args" func)
-                        ($ args)
-                        (lookup func primitives)
+apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
+apply (PrimitiveFunc func) args = liftThrows $ func args
+apply (Func params varargs body closure) args =
+      if num params /= num args && varargs == Nothing
+        then throwError $ NumArgs (num params) args
+        else (liftIO $ bindVars closure $ zip params args) >>= bindVarArgs varargs >>= evalBody
+      where remainingArgs = drop (length params) args
+            num = toInteger . length
+            evalBody env = fmap last $ mapM (eval env) body
+            bindVarArgs arg env = case arg of
+              Just argName -> liftIO $ bindVars env [(argName, List remainingArgs)]
+              Nothing -> return env
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives = [("+", numericBinop (+)),
@@ -59,9 +79,13 @@ primitives = [("+", numericBinop (+)),
               ("eqv?", eqv),
               ("equal?", equal)]
 
-numericBinop:: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
-numericBinop op []  = throwError $ NumArgs 2 []
-numericBinop op singleVal@[_] = throwError $ NumArgs 2 singleVal
+primitiveBindings :: IO Env
+primitiveBindings = nullEnv >>= (flip bindVars $ map makePrimitiveFunc primitives)
+     where makePrimitiveFunc (var, func) = (var, PrimitiveFunc func)
+
+numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
+numericBinop _ []  = throwError $ NumArgs 2 []
+numericBinop _ singleVal@[_] = throwError $ NumArgs 2 singleVal
 numericBinop op params        = fmap (Number . foldl1 op) (mapM unpackNum params)
 
 boolBinop :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [LispVal] -> ThrowsError LispVal
@@ -71,8 +95,11 @@ boolBinop unpacker op args = if length args /= 2
                       right <- unpacker $ args !! 1
                       return $ Bool $ left `op` right
 
+numBoolBinop :: (Integer -> Integer -> Bool) -> [LispVal] -> ThrowsError LispVal
 numBoolBinop  = boolBinop unpackNum
+strBoolBinop :: (String -> String -> Bool) -> [LispVal] -> ThrowsError LispVal
 strBoolBinop  = boolBinop unpackStr
+boolBoolBinop :: (Bool -> Bool -> Bool) -> [LispVal] -> ThrowsError LispVal
 boolBoolBinop = boolBinop unpackBool
 
 unpackNum :: LispVal -> ThrowsError Integer
