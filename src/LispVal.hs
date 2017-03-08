@@ -49,6 +49,19 @@ showLispVal Func {params = args, vararg = varargs, body = body, closure = env} =
                          Nothing -> ""
                          Just arg -> " . " ++ arg) ++ ") ...)"
 
+instance Eq LispVal where x == y = x `eqLispVal` y
+
+eqLispVal :: LispVal -> LispVal -> Bool
+eqLispVal (Atom x) (Atom y) = x == y
+eqLispVal (Number x) (Number y) = x == y
+eqLispVal (String x) (String y) = x == y
+eqLispVal (Bool x) (Bool y) = x == y
+eqLispVal (Character x) (Character y) = x == y
+eqLispVal xs@(List _) ys@(List _) = showLispVal xs == showLispVal ys
+eqLispVal xs@(DottedList _ _) ys@(DottedList _ _) = showLispVal xs == showLispVal ys
+eqLispVal _ _ = False
+
+
 
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
