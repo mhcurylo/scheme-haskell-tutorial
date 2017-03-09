@@ -11,18 +11,17 @@ module Parser
       parseQuoted,
     ) where
 
-import Text.ParserCombinators.Parsec hiding (spaces)
-import Control.Monad
-import Numeric (readHex, readDec, readOct)
-import LispVal
-import Control.Monad.Except
+import           Control.Monad.Except
+import           LispVal
+import           Numeric                       (readDec, readHex, readOct)
+import           Text.ParserCombinators.Parsec hiding (spaces)
 
 symbol:: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 
 parseString:: Parser LispVal
 parseString = do
-    char '"'
+    _ <- char '"'
     x <- many character
     char '"'
     return $ String $ concat x
@@ -63,20 +62,23 @@ parseChar = do
     a <- char '\\'
     b <- try (string "newline" <|> string "space") <|> parseSingleChar
     return $ Character $ case b of
-                "space" -> ' '
+                "space"   -> ' '
                 "newline" -> '\n'
-                _ -> head b
+                _         -> head b
 
 parseBase:: Parser LispVal
-parseBase = parseBaseD <|> parseBaseH
+parseBase = parseBaseD <|> parseBaseH <|> parseBaseO
 
-parseBaseD:: Parser LispVal 
-parseBaseD = char 'd' >> many1 digit >>= \a -> toLispNumber $ readDec a 
+parseBaseD:: Parser LispVal
+parseBaseD = char 'd' >> many1 digit >>= \a -> toLispNumber $ readDec a
 
-parseBaseH:: Parser LispVal 
-parseBaseH = char 'h' >> many1 (digit <|> oneOf "abcdef") >>= \a -> toLispNumber $ readHex a 
+parseBaseH:: Parser LispVal
+parseBaseH = char 'h' >> many1 (digit <|> oneOf "abcdef") >>= \a -> toLispNumber $ readHex a
 
-toLispNumber a = return $ Number . toInteger $ fst . head $ a 
+parseBaseO:: Parser LispVal
+parseBaseO = char 'o' >> many1 (oneOf "01234567") >>= \a -> toLispNumber $ readOct a
+
+toLispNumber a = return $ Number . toInteger $ fst . head $ a
 
 parseSingleChar:: Parser String
 parseSingleChar = do
@@ -88,7 +90,7 @@ parseNumber:: Parser LispVal
 parseNumber = Number . read <$> many1 digit
 
 parseExpr:: Parser LispVal
-parseExpr =  parseNumber 
+parseExpr =  parseNumber
          <|> parseString
          <|> parseHash
          <|> parseAtom
@@ -101,9 +103,9 @@ parseParens = do
     x <- parseExpr `sepEndBy` spaces
     mayb <- optionMaybe (char '.' >> spaces >> parseExpr)
     char ')'
-    return $ case mayb of 
+    return $ case mayb of
       Nothing -> List x
-      Just y -> DottedList x y
+      Just y  -> DottedList x y
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
@@ -116,7 +118,7 @@ spaces = skipMany1 space
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
-    Left err -> throwError $ Parser err
+    Left err  -> throwError $ Parser err
     Right val -> return val
 
 readExpr :: String -> ThrowsError LispVal
