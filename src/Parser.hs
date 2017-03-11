@@ -12,18 +12,21 @@ module Parser
     ) where
 
 import           Control.Monad.Except
+import           Data.Char
 import           LispVal
-import           Numeric                       (readDec, readHex, readOct)
+import           Numeric                       (readDec, readHex, readInt,
+                                                readOct)
 import           Text.ParserCombinators.Parsec hiding (spaces)
 
-symbol:: Parser Char
+
+symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 
-parseString:: Parser LispVal
+parseString :: Parser LispVal
 parseString = do
     _ <- char '"'
     x <- many character
-    char '"'
+    _ <- char '"'
     return $ String $ concat x
 
 escape :: Parser String
@@ -38,26 +41,25 @@ nonEscape = noneOf "\\\""
 character :: Parser String
 character = fmap return nonEscape <|> escape
 
-parseAtom:: Parser LispVal
+parseAtom :: Parser LispVal
 parseAtom = do
     x <- letter <|> symbol
     xs <- many (letter <|> digit <|> symbol)
     return $ Atom $ x:xs
 
-parseHash:: Parser LispVal
+parseHash :: Parser LispVal
 parseHash = do
-    a <- char '#'
-    b <- parseBool <|> parseChar <|> parseBase
-    return b
+    _ <- char '#'
+    parseBool <|> parseChar <|> parseBase
 
-parseBool:: Parser LispVal
+parseBool :: Parser LispVal
 parseBool = do
     v <- oneOf "tf"
     return $ Bool $ case v of
                 't' -> True
                 'f' -> False
 
-parseChar:: Parser LispVal
+parseChar :: Parser LispVal
 parseChar = do
     a <- char '\\'
     b <- try (string "newline" <|> string "space") <|> parseSingleChar
@@ -66,30 +68,37 @@ parseChar = do
                 "newline" -> '\n'
                 _         -> head b
 
-parseBase:: Parser LispVal
-parseBase = parseBaseD <|> parseBaseH <|> parseBaseO
+parseBase :: Parser LispVal
+parseBase = parseBaseD <|> parseBaseH <|> parseBaseO <|> parseBaseB
 
-parseBaseD:: Parser LispVal
-parseBaseD = char 'd' >> many1 digit >>= \a -> toLispNumber $ readDec a
+parseBaseD :: Parser LispVal
+parseBaseD = char 'd' >> many1 digit >>= toLispNumber . readDec
 
-parseBaseH:: Parser LispVal
-parseBaseH = char 'h' >> many1 (digit <|> oneOf "abcdef") >>= \a -> toLispNumber $ readHex a
+parseBaseH :: Parser LispVal
+parseBaseH = char 'h' >> many1 (digit <|> oneOf "abcdef") >>= toLispNumber . readHex
 
-parseBaseO:: Parser LispVal
-parseBaseO = char 'o' >> many1 (oneOf "01234567") >>= \a -> toLispNumber $ readOct a
+parseBaseO :: Parser LispVal
+parseBaseO = char 'o' >> many1 (oneOf "01234567") >>= toLispNumber . readOct
 
-toLispNumber a = return $ Number . toInteger $ fst . head $ a
+parseBaseB :: Parser LispVal
+parseBaseB = char 'b' >> many1 (oneOf "01") >>= toLispNumber . readBin
 
-parseSingleChar:: Parser String
+readBin :: ReadS Integer
+readBin = readInt 2 (`elem` "01") digitToInt
+
+toLispNumber :: [(Integer, String)] -> Parser LispVal
+toLispNumber a = return $ Number . toInteger . fst . head $ a
+
+parseSingleChar :: Parser String
 parseSingleChar = do
     x <- anyChar
     _ <- try $ lookAhead $ oneOf " ()"
     return [x];
 
-parseNumber:: Parser LispVal
+parseNumber :: Parser LispVal
 parseNumber = Number . read <$> many1 digit
 
-parseExpr:: Parser LispVal
+parseExpr :: Parser LispVal
 parseExpr =  parseNumber
          <|> parseString
          <|> parseHash
@@ -97,23 +106,23 @@ parseExpr =  parseNumber
          <|> parseQuoted
          <|> parseParens
 
-parseParens:: Parser LispVal
+parseParens  :: Parser LispVal
 parseParens = do
-    char '('
+    _ <- char '('
     x <- parseExpr `sepEndBy` spaces
     mayb <- optionMaybe (char '.' >> spaces >> parseExpr)
-    char ')'
+    _ <- char ')'
     return $ case mayb of
       Nothing -> List x
       Just y  -> DottedList x y
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
-    char '\''
+    _ <- char '\''
     x <- parseExpr
     return $ List [Atom "quote", x]
 
-spaces:: Parser ()
+spaces :: Parser ()
 spaces = skipMany1 space
 
 readOrThrow :: Parser a -> String -> ThrowsError a
