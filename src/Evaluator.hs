@@ -18,7 +18,7 @@ eval _ val@(Number _) = return val
 eval _ val@(Bool _) = return val
 eval env (Atom id') = getVar env id'
 eval _ (List [Atom "quote", val]) = return val
-eval env (List [Atom "if", pre, conseq, alt]) = 
+eval env (List [Atom "if", pre, conseq, alt]) =
      do result <- eval env pre
         case result of
           Bool False -> eval env alt
@@ -76,6 +76,13 @@ primitives = [("+", numericBinop (+)),
               ("string>?", strBoolBinop (>)),
               ("string<=?", strBoolBinop (<=)),
               ("string>=?", strBoolBinop (>=)),
+              ("string?", isType "String"),
+              ("symbol?", isType "Atom"),
+              ("number?", isType "Number"),
+              ("boolean?", isType "Bool"),
+              ("list?", isType "List"),
+              ("number?", isType "Number"),
+              ("charachter?", isType "Char"),
               ("car", car),
               ("cdr", cdr),
               ("cons", cons),
@@ -104,7 +111,7 @@ numericBinop _ singleVal@[_] = throwError $ NumArgs 2 singleVal
 numericBinop op params        = fmap (Number . foldl1 op) (mapM unpackNum params)
 
 boolBinop :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [LispVal] -> ThrowsError LispVal
-boolBinop unpacker op args = if length args /= 2 
+boolBinop unpacker op args = if length args /= 2
               then throwError $ NumArgs 2 args
               else do left <- unpacker $ head args
                       right <- unpacker $ args !! 1
@@ -119,8 +126,8 @@ boolBoolBinop = boolBinop unpackBool
 
 unpackNum :: LispVal -> ThrowsError Integer
 unpackNum (Number n) = return n
-unpackNum (String n) = let parsed = reads n in 
-                           if null parsed 
+unpackNum (String n) = let parsed = reads n in
+                           if null parsed
                              then throwError $ TypeMismatch "number" $ String n
                              else return $ fst $ head parsed
 unpackNum (List [n]) = unpackNum n
@@ -156,12 +163,26 @@ cons [x, DottedList xs xlast] = return $ DottedList (x : xs) xlast
 cons [x1, x2] = return $ DottedList [x1] x2
 cons badArgList = throwError $ NumArgs 2 badArgList
 
+isType :: String -> [LispVal] -> ThrowsError LispVal
+isType t args = if l < 1 || l > 1
+  then throwError $ NumArgs 1 args
+  else return $ Bool $ case head args of
+    (Atom _) -> t == "Atom"
+    (List _) -> t == "List"
+    (DottedList _ _) -> t == "List"
+    (Number _) -> t == "Number"
+    (String _) -> t == "String"
+    (Bool _) -> t == "Bool"
+    (Character _) -> t == "Char"
+    _ -> False
+  where l = length args
+
 eqv :: [LispVal] -> ThrowsError LispVal
 eqv [Bool arg1, Bool arg2]                 = return $ Bool $ arg1 == arg2
 eqv [Number arg1, Number arg2]             = return $ Bool $ arg1 == arg2
 eqv [String arg1, String arg2]             = return $ Bool $ arg1 == arg2
 eqv [Atom arg1, Atom arg2]                 = return $ Bool $ arg1 == arg2
-eqv dl@[DottedList _ _, DottedList _ _]  = eqLispList eqv dl 
+eqv dl@[DottedList _ _, DottedList _ _]  = eqLispList eqv dl
 eqv l@[List _, List _]               = eqLispList eqv l
 eqv [_, _]                                 = return $ Bool False
 eqv badArgList                             = throwError $ NumArgs 2 badArgList
@@ -176,17 +197,17 @@ eqLispList f [List arg1, List arg2]             = return $ Bool $ (length arg1 =
 
 data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
 unpackEquals :: LispVal -> LispVal -> Unpacker -> ThrowsError Bool
-unpackEquals arg1 arg2 (AnyUnpacker unpacker) = do 
+unpackEquals arg1 arg2 (AnyUnpacker unpacker) = do
                                                   unpacked1 <- unpacker arg1
                                                   unpacked2 <- unpacker arg2
-                                                  return $ unpacked1 == unpacked2 
+                                                  return $ unpacked1 == unpacked2
                                                 `catchError` (const $ return False)
 
 equal :: [LispVal] -> ThrowsError LispVal
-equal dl@[DottedList _ _, DottedList _ _]  = eqLispList equal dl 
+equal dl@[DottedList _ _, DottedList _ _]  = eqLispList equal dl
 equal l@[List _, List _] = eqLispList equal l
 equal [arg1, arg2]       = do
-                             primitiveEquals <- or <$> mapM (unpackEquals arg1 arg2) 
+                             primitiveEquals <- or <$> mapM (unpackEquals arg1 arg2)
                                                        [AnyUnpacker unpackNum, AnyUnpacker unpackStr, AnyUnpacker unpackBool]
                              eqvEquals <- eqv [arg1, arg2]
                              return $ Bool (primitiveEquals || let (Bool x) = eqvEquals in x)
