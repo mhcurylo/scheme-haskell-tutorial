@@ -1,5 +1,5 @@
-module LispVal 
-    (  LispVal(..), 
+module LispVal
+    (  LispVal(..),
        LispError(..),
        ThrowsError,
        trapError,
@@ -25,7 +25,7 @@ data LispVal = Atom String
              | IOFunc ([LispVal] -> IOThrowsError LispVal)
              | Port Handle
              | Func {params:: [String],
-                     vararg:: (Maybe String),
+                     vararg:: Maybe String,
                      body:: [LispVal],
                      closure:: Env}
 
@@ -43,7 +43,7 @@ showLispVal (DottedList x xs) = "(" ++ unwords (map showLispVal x) ++ " . " ++ s
 showLispVal (Port _)   = "<IO port>"
 showLispVal (IOFunc _) = "<IO primitive>"
 showLispVal (PrimitiveFunc _) = "<primitive>"
-showLispVal Func {params = args, vararg = varargs, body = body, closure = env} =
+showLispVal Func {params = args, vararg = varargs, body = _, closure = _} =
                  "(lambda (" ++ unwords (map show args) ++
                       (case varargs of
                          Nothing -> ""
