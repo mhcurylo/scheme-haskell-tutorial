@@ -16,12 +16,13 @@ eval :: Env -> LispVal -> IOThrowsError LispVal
 eval _ val@(String _) = return val
 eval _ val@(Number _) = return val
 eval _ val@(Bool _) = return val
+eval _ val@(Atom "'nil") = return val
 eval env (Atom id') = getVar env id'
 eval _ (List [Atom "quote", val]) = return val
 eval env (List [Atom "if", pre, conseq, alt]) =
      do result <- eval env pre
         case result of
-          Bool False -> eval env al
+          Bool False -> eval env alt
           Bool True  -> eval env conseq
           _          -> throwError $ TypeMismatch "Bool" result
 eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
@@ -39,16 +40,18 @@ eval env (List (func : args)) = do func' <- eval env func
 eval _ badForm = throwError $ BadSpecialForm "Unrecognised special form" badForm
 
 lispCase :: Env -> LispVal -> [LispVal] -> IOThrowsError LispVal
-lispCase env condition [] = throwError $ BadSpecialForm "No cases for case." $ List [condition]
-lispCase env condition [List (Atom "else" : args)] = evalAllReturnLast env args
-lispCase env condition [(List (List datums): exprs): xs] = do key <- eval env condition
-                                                           eqvs <- mapM (\x -> eqv [key, key]) datums
-                                                           return $ case (Bool True) `elem` eqvs of
-                                                                True -> evalAllReturnLast env exprs
-                                                                False -> lispCase env key xs
+lispCase env _ [] = evalAllReturnLast env []
+lispCase env _ [List (Atom "else" : args)] = evalAllReturnLast env args
+lispCase env condition (List (List datums: exprs) : xs) = do key <- eval env condition
+                                                             eqvs <- mapM (\x -> liftThrows $ eqv [key, x]) datums
+                                                             if Bool True `elem` eqvs
+                                                                then evalAllReturnLast env exprs
+                                                                else lispCase env key xs
+lispCase _ condition _ = throwError $ BadSpecialForm "Bad form of case" $ List [condition]
 
 evalAllReturnLast :: Env -> [LispVal] -> IOThrowsError LispVal
-evalAllReturnLast env args = mapM (eval env) args >>= return . last
+evalAllReturnLast env [] = eval env $ Atom "'nil"
+evalAllReturnLast env l@(_:_) = mapM (eval env) l >>= return . last
 
 
 makeFunc varargs env params' body' = return $ Func (map show params') varargs body' env
@@ -68,7 +71,7 @@ apply (Func params varargs body closure) args =
             bindVarArgs arg env = case arg of
               Just argName -> liftIO $ bindVars env [(argName, List remainingArgs)]
               Nothing -> return env
-apply _ _ = throwError ThrowsError $ Default "Tired to misapply"
+apply _ _ = throwError $ Default "Tired to misapply"
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives = [("+", numericBinop (+)),
