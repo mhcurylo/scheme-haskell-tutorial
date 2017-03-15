@@ -34,6 +34,7 @@ eval env (List (Atom "lambda" : DottedList params' varargs : body')) = makeVarAr
 eval env (List (Atom "lambda" : varargs@(Atom _) : body')) = makeVarArgs varargs env [] body'
 eval env (List [Atom "load", String filename]) = load filename >>= fmap last . mapM (eval env)
 eval env (List (Atom "case": condition: cases)) = lispCase env condition cases
+eval env (List (Atom "cond": clauses)) = lispCond env clauses
 eval env (List (func : args)) = do func' <- eval env func
                                    argVals <- mapM (eval env) args
                                    apply func' argVals
@@ -48,6 +49,18 @@ lispCase env condition (List (List datums: exprs) : xs) = do key <- eval env con
                                                                 then evalAllReturnLast env exprs
                                                                 else lispCase env key xs
 lispCase _ condition _ = throwError $ BadSpecialForm "Bad form of case" $ List [condition]
+
+lispCond :: Env -> [LispVal] -> IOThrowsError LispVal
+lispCond env [] = evalAllReturnLast env []
+lispCond env [List (Atom "else" : cases)] = evalAllReturnLast env cases
+lispCond env (List (condition : cases) : xs )= do key <- eval env condition
+                                                  isTrue <- liftThrows $ eqv [Bool True, key]
+                                                  if isTrue == Bool True
+                                                    then case cases of
+                                                    [] -> return key
+                                                    (Atom "=>" : expr : []) -> eval env expr
+                                                    _ -> evalAllReturnLast env cases
+                                                  else lispCond env xs
 
 evalAllReturnLast :: Env -> [LispVal] -> IOThrowsError LispVal
 evalAllReturnLast env [] = eval env $ Atom "'nil"
