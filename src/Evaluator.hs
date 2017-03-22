@@ -10,6 +10,7 @@ import           Environment
 import           LispVal
 import           Parser
 import           System.IO
+import qualified System.Process (readProcess)
 
 
 eval :: Env -> LispVal -> IOThrowsError LispVal
@@ -127,6 +128,7 @@ ioPrimitives = [("apply", applyProc),
                 ("open-output-file", makePort WriteMode),
                 ("close-input-port", closePort),
                 ("close-output-port", closePort),
+                ("read-process", readProcess),
                 ("read", readProc),
                 ("write", writeProc),
                 ("read-contents", readContents),
@@ -263,6 +265,12 @@ readProc [Port port] = (liftIO $ hGetLine port) >>= liftThrows . readExpr
 writeProc :: [LispVal] -> IOThrowsError LispVal
 writeProc [obj]            = writeProc [obj, Port stdout]
 writeProc [obj, Port port] = liftIO $ hPrint port obj >> (return $ Bool True)
+
+readProcess2 :: String -> IO String
+readProcess2 cmd = System.Process.readProcess cmd [] ""
+
+readProcess :: [LispVal] -> IOThrowsError LispVal
+readProcess [String filename] = liftM String $ liftIO $ readProcess2 filename
 
 readContents :: [LispVal] -> IOThrowsError LispVal
 readContents [String filename] = liftM String $ liftIO $ readFile filename
